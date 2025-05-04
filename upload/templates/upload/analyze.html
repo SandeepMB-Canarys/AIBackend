@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .dropzone {
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+
+        .dropzone.dragover {
+            background: #e9ecef;
+            border-color: #0d6efd;
+        }
+
+        .spinner {
+            display: none;
+        }
+
+        .spinner.show {
+            display: inline-block;
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .api-key-input {
+            font-family: monospace;
+        }
+
+        /* Snackbar styles */
+        #snackbar {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            left: 50%;
+            bottom: 30px;
+        }
+
+        #snackbar.show {
+            visibility: visible;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+
+        #snackbar.success {
+            background-color: #28a745;
+        }
+
+        #snackbar.error {
+            background-color: #dc3545;
+        }
+
+        @keyframes fadein {
+            from {
+                bottom: 0;
+                opacity: 0;
+            }
+
+            to {
+                bottom: 30px;
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeout {
+            from {
+                bottom: 30px;
+                opacity: 1;
+            }
+
+            to {
+                bottom: 0;
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title text-center mb-4">Document Analysis</h3>
+                        {% if error %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ error }}
+                        </div>
+                        {% else %}
+
+                        <div class="mb-3">
+                            <h5>Document Information</h5>
+                            <p><strong>File:</strong> {{ document.document.name }}</p>
+                        </div>
+
+                        <div class="analysis-container">
+                            <div id="analysisError" class="alert alert-danger" style="display: none;"></div>
+
+                            <!-- Analysis Results Section -->
+                            <div class="results-section">
+                                <!-- Analysis Summary Card -->
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Analysis Summary</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row text-center">
+                                            <div class="col">
+                                                <h6>Total Rules</h6>
+                                                <span id="totalRules" class="h4">0</span>
+                                            </div>
+                                            <div class="col">
+                                                <h6>Passed Rules</h6>
+                                                <span id="passedRules" class="h4 text-success">0</span>
+                                            </div>
+                                            <div class="col">
+                                                <h6>Failed Rules</h6>
+                                                <span id="failedRules" class="h4 text-danger">0</span>
+                                            </div>
+                                        </div>
+                                        <div class="progress mt-3" style="height: 25px;">
+                                            <div id="complianceProgressBar" class="progress-bar" role="progressbar"
+                                                style="width: 0%" aria-valuenow="0" aria-valuemin="0"
+                                                aria-valuemax="100">
+                                                0%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Status Card -->
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Document Information</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <!-- Document Type and Processing Time -->
+                                            <div class="col-md-6 mb-3">
+                                                <p><strong>Document Type:</strong> <span id="documentType">-</span></p>
+                                                <p><strong>Processing Time:</strong> <span id="processingTime">-</span>
+                                                    seconds</p>
+                                            </div>
+
+                                            <!-- AI Provider and LLM Model -->
+                                            <div class="col-md-6 mb-3">
+                                                <p><strong>AI Provider:</strong> {{ document.ai_provider }}</p>
+                                                <p><strong>LLM Model:</strong> {{ document.llm_model }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <!-- Usage Statistics Card -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0">Usage Statistics</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <p class="mb-2"><strong>Status:</strong></p>
+                                                    <h4 id="analysisStatus" class="text-primary">Processing...</h4>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <p class="mb-2"><strong>Created Time:</strong></p>
+                                                    <h4 id="completed_at" class="text-secondary">-</h4>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <p class="mb-2"><strong>Total Tokens:</strong></p>
+                                                    <h4 id="totalTokens" class="text-info">0</h4>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <p class="mb-2"><strong>Total Cost:</strong></p>
+                                                    <h4 class="text-success">$<span id="totalCost">0.00</span></h4>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between">
+                                            <a href="{% url 'upload_document' %}" class="btn btn-secondary btn-lg">
+                                                <i class="bi bi-upload"></i> Upload Another Document
+                                            </a>
+                                            <div>
+                                                <a href="{% url 'download_document' document.id %}"
+                                                    class="btn btn-outline-primary btn-lg me-2">
+                                                    <i class="bi bi-file-earmark"></i> Download Original
+                                                </a>
+                                                <a id="downloadReport" href="#" class="btn btn-primary btn-lg">
+                                                    <i class="bi bi-file-earmark-text"></i> Download Report
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const documentId = '{{ document.id }}';
+            const error = document.getElementById('analysisError');
+
+            // Function to convert UTC to IST
+            function convertToIST(utcDate) {
+                const date = new Date(utcDate);
+                const options = {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZone: 'Asia/Kolkata'
+                };
+                return date.toLocaleString('en-IN', options);
+            }
+
+            async function loadAnalysisData() {
+                try {
+                    const response = await fetch(`/analyze/${documentId}/`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    const data = await response.json();
+                    console.log('Analysis data:', data);
+
+                    if (data.status === 'success') {
+
+                        document.querySelector('.results-section').style.display = 'block'; // Show results
+
+                        // Update rules statistics
+                        const stats = data.stats || {};
+                        document.getElementById('totalRules').textContent = stats.total_rules || '0';
+                        document.getElementById('passedRules').textContent = stats.passed_rules || '0';
+                        document.getElementById('failedRules').textContent = stats.failed_rules || '0';
+
+                        // Update compliance progress bar
+                        const complianceRate = parseFloat(stats.compliance_rate) || 0;
+                        const progressBar = document.getElementById('complianceProgressBar');
+                        if (progressBar) {
+                            progressBar.style.width = `${complianceRate}%`;
+                            progressBar.setAttribute('aria-valuenow', complianceRate);
+                            progressBar.textContent = `${complianceRate.toFixed(1)}%`;
+
+                            progressBar.classList.remove('bg-success', 'bg-warning', 'bg-danger');
+                            if (complianceRate >= 80) {
+                                progressBar.classList.add('bg-success');
+                            } else if (complianceRate >= 50) {
+                                progressBar.classList.add('bg-warning');
+                            } else {
+                                progressBar.classList.add('bg-danger');
+                            }
+                        }
+
+                        // Update document info
+                        document.getElementById('analysisStatus').textContent = 'Completed';
+                        document.getElementById('documentType').textContent = data.doc_type || 'Unknown';
+                        document.getElementById('processingTime').textContent = data.usage.latency || 'unknown';
+                        document.getElementById('completed_at').textContent = convertToIST(data.created_at) || 'Unknown';
+
+                        // Update usage statistics
+                        const usage = data.usage || {};
+                        const totalTokens = (usage.input_tokens || 0) + (usage.output_tokens || 0);
+                        document.getElementById('totalTokens').textContent = totalTokens.toLocaleString();
+                        document.getElementById('totalCost').textContent = (usage.total_cost || 0).toFixed(4);
+
+                        // Update download report button
+                        const downloadBtn = document.getElementById('downloadReport');
+                        if (downloadBtn && data.report_url) {
+                            downloadBtn.href = data.report_url;
+                        }
+                    } else {
+                        throw new Error(data.message || 'Analysis failed');
+                    }
+                } catch (error) {
+                    console.error('Analysis error:', error);
+                    error.textContent = error.message;
+                    error.style.display = 'block';
+                }
+            }
+
+            // Start loading analysis data
+            loadAnalysisData();
+        });
+    </script>
+</body>
+
+</html>
